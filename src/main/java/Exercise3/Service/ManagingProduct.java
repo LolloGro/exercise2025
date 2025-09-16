@@ -13,11 +13,13 @@ public class ManagingProduct implements Warehouse {
 
     @Override
     public void addProduct(Product product) {
-        Product exist = listOfProducts.stream()
-                .filter(item -> item.id().equals(product.id()))
-                .findFirst().orElse(null);
 
-        if(exist != null && product.modifiedDate().equals(LocalDate.now())){
+        Objects.requireNonNull(product, "Product cannot be null");
+
+        boolean exists = listOfProducts.stream()
+                        .anyMatch(item -> item.id().equals(product.id()));
+
+        if(exists) {
             throw new IllegalArgumentException("Product already exists");
         }
 
@@ -41,9 +43,12 @@ public class ManagingProduct implements Warehouse {
     @Override
     public Product getProductById(String id) {
 
+        Objects.requireNonNull(id, "Product id cannot be null");
+
         Product productById = listOfProducts.stream()
-                .filter(item -> item.id().equals(id))
-                .findFirst().orElse(null);
+                .filter(item -> item.id().equals(id.trim()))
+                .max(Comparator.comparing(Product::modifiedDate))
+                .orElse(null);
 
         if(productById == null){
             throw new IllegalArgumentException("Product doesn't exist");
@@ -56,6 +61,7 @@ public class ManagingProduct implements Warehouse {
     public List<Product> getProductsByCategorySorted(Category category) {
 
         checkIsListIsEmpty();
+        Objects.requireNonNull(category, "Category cannot be null");
 
         return listOfProducts.stream()
                 .filter(item -> item.category().equals(category))
@@ -66,6 +72,7 @@ public class ManagingProduct implements Warehouse {
     public List<Product> getProductsCreatedAfter(LocalDate after) {
 
         checkIsListIsEmpty();
+        Objects.requireNonNull(after, "Date cannot be null");
 
         return listOfProducts.stream()
                 .filter(item -> item.createdDate().isAfter(after)).toList();
@@ -92,13 +99,16 @@ public class ManagingProduct implements Warehouse {
 
         return countedProducts.entrySet().stream()
                 .filter(entry -> entry.getValue() > 0)
+                .sorted(Map.Entry.comparingByKey())
                 .map(Map.Entry::getKey).toList();
+
     }
 
     @Override
     public Long countProductsInCategory(Category category) {
 
         checkIsListIsEmpty();
+        Objects.requireNonNull(category, "Category cannot be null");
 
         return listOfProducts.stream()
                 .filter(item -> item.category().equals(category)).count();
@@ -109,19 +119,16 @@ public class ManagingProduct implements Warehouse {
 
         checkIsListIsEmpty();
 
-        Map<Category, Long> listOfCategoryWithCount = listOfProducts.stream()
-                .collect(Collectors.groupingBy(Product::category, Collectors.counting()));
-
-        return listOfCategoryWithCount.entrySet().stream()
-                .collect(Collectors.toMap(letter -> letter.getKey().name().charAt(0),
-                        count -> count.getValue().intValue()));
+        return listOfProducts.stream()
+                .collect(Collectors.groupingBy(item -> item.category().name().charAt(0),Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
     }
 
     @Override
     public List<Product> getTopProductsThisMonth() {
         LocalDate today = LocalDate.now();
         List<Product> listFilteredByMonth = listOfProducts.stream()
-                .filter(item -> item.createdDate().getMonth().equals(today.getMonth())).toList();
+                .filter(item -> item.createdDate().getYear() == today.getYear() &&
+                        item.createdDate().getMonth().equals(today.getMonth())).toList();
 
         return listFilteredByMonth.stream()
                 .filter(item -> item.rating() == 10)
